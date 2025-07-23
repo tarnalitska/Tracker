@@ -1,0 +1,278 @@
+import UIKit
+
+class TrackersViewController: UIViewController {
+    
+    private let viewModel = TrackersViewModel()
+    private var trackers: [Tracker] = []
+    private var trackerCoordinator: TrackerCreationCoordinator?
+    private var currentDate: Date = Date()
+    
+    private let collectionViewLayout: UICollectionViewFlowLayout = {
+        let layout = UICollectionViewFlowLayout()
+        
+        layout.sectionInset = UIEdgeInsets(top: 12, left: 16, bottom: 16, right: 16)
+        
+        layout.minimumLineSpacing = 12
+        layout.minimumInteritemSpacing = 9
+        
+        let totalSpacing: CGFloat = 16 + 16 + 9
+        let availableWidth = UIScreen.main.bounds.width - totalSpacing
+        let itemWidth = floor(availableWidth / 2)
+        
+        layout.itemSize = CGSize(width: itemWidth, height: 148)
+        
+        return layout
+    }()
+    
+    private lazy var collectionView: UICollectionView = {
+        let collectionView = UICollectionView(frame: .zero, collectionViewLayout: collectionViewLayout)
+        collectionView.translatesAutoresizingMaskIntoConstraints = false
+        collectionView.dataSource = self
+        collectionView.delegate = self
+        
+        collectionView.register(
+            TrackerCell.self,
+            forCellWithReuseIdentifier: "TrackerCell"
+        )
+        
+        collectionView.register(
+            TrackerSectionHeaderView.self,
+            forSupplementaryViewOfKind: UICollectionView.elementKindSectionHeader,
+            withReuseIdentifier: TrackerSectionHeaderView.reuseIdentifier
+        )
+        
+        return collectionView
+    }()
+    
+    private lazy var emptyView: EmptyStateView = {
+        let view = EmptyStateView(
+            image: UIImage(named: "empty_state"),
+            message: "Что будем отслеживать?"
+        )
+        view.translatesAutoresizingMaskIntoConstraints = false
+        return view
+    }()
+    
+    var categories: [TrackerCategory] = []
+    var completedTrackers: [TrackerRecord] = []
+    
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        
+        let defaultCategory = TrackerCategory(title: "Мои трекеры", trackers: [])
+        categories = [defaultCategory]
+        viewModel.setCategories(categories)
+        
+        setupUI()
+        
+        collectionView.reloadData()
+        
+        viewModel.onRecordsChanged = { [weak self] in
+            self?.collectionView.reloadData()
+        }
+        
+        viewModel.onCategoriesUpdated = { [weak self] in
+            self?.collectionView.reloadData()
+            self?.updateEmptyState(isEmpty: self?.viewModel.filteredCategories.isEmpty ?? true)
+        }
+        
+        viewModel.setCategories(categories)
+    }
+    
+    private func setupUI() {
+        addPlusButton()
+        addTitle()
+        addDatePicker()
+        
+        view.addSubview(collectionView)
+        
+        NSLayoutConstraint.activate([
+            collectionView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 60),
+            collectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            collectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            collectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+        ])
+        
+        updateEmptyState(isEmpty: categories.isEmpty)
+    }
+    
+    func addTitle() {
+        let label = UILabel()
+        label.text = "Трекеры"
+        label.textColor = .trackerBlack
+        label.font = .systemFont(ofSize: 34, weight: .bold)
+        label.translatesAutoresizingMaskIntoConstraints = false
+        
+        view.addSubview(label)
+        
+        NSLayoutConstraint.activate([
+            label.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+            label.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 1)
+        ])
+    }
+    
+    func addPlusButton() {
+        let plusButton = UIButton(type: .system)
+        plusButton.tintColor = .trackerBlack
+        plusButton.contentHorizontalAlignment = .left
+        plusButton.frame = CGRect(x: 0, y: 0, width: 42, height: 42)
+        
+        var config = UIButton.Configuration.plain()
+        config.image = UIImage(named: "plus_icon")
+        config.imagePlacement = .leading
+        config.imagePadding = 1
+        config.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 1, bottom: 0, trailing: 0)
+        plusButton.configuration = config
+        
+        plusButton.addTarget(self, action: #selector(plusTapped), for: .touchUpInside)
+        
+        let containerView = UIView(frame: CGRect(x: 0, y: 0, width: 42, height: 42))
+        containerView.addSubview(plusButton)
+        
+        navigationItem.leftBarButtonItem = UIBarButtonItem(customView: containerView)
+    }
+    
+    func addDatePicker() {
+        let datePicker = UIDatePicker()
+        datePicker.datePickerMode = .date
+        datePicker.addTarget(self, action: #selector(dateChanged(_:)), for: .valueChanged)
+        navigationItem.rightBarButtonItem = UIBarButtonItem(customView: datePicker)
+    }
+    
+    @objc func dateChanged(_ sender: UIDatePicker) {
+        currentDate = sender.date
+        viewModel.updateSelectedDate(currentDate)
+    }
+    
+    func updateEmptyState(isEmpty: Bool) {
+        if isEmpty {
+            if emptyView.superview == nil {
+                view.addSubview(emptyView)
+                
+                NSLayoutConstraint.activate([
+                    emptyView.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor),
+                    emptyView.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor),
+                    emptyView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+                    emptyView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor)
+                ])
+            }
+        } else {
+            emptyView.removeFromSuperview()
+        }
+    }
+    
+    @objc private func plusTapped() {
+        let coordinator = TrackerCreationCoordinator(presentingViewController: self)
+        
+        coordinator.onFinishCreation = { [weak self] tracker, category in
+            guard let self = self else { return }
+            
+            self.addTracker(tracker, to: category)
+            self.viewModel.setCategories(self.categories)
+            
+            self.viewModel.updateSelectedDate(self.viewModel.selectedDate)
+            
+            self.collectionView.reloadData()
+            self.trackerCoordinator = nil
+        }
+        coordinator.start()
+        trackerCoordinator = coordinator
+    }
+}
+
+extension TrackersViewController {
+    func addTracker(_ tracker: Tracker, to categoryTitle: String) {
+        if let existingCategoryIndex = categories.firstIndex(where: {$0.title == categoryTitle}) {
+            let existingCategory = categories[existingCategoryIndex]
+            
+            let updatedCategory = TrackerCategory(
+                title: existingCategory.title,
+                trackers: existingCategory.trackers + [tracker]
+            )
+            
+            categories[existingCategoryIndex] = updatedCategory
+        } else {
+            let newCategory = TrackerCategory(
+                title: categoryTitle,
+                trackers: [tracker]
+            )
+            categories.append(newCategory)
+        }
+        
+        updateEmptyState(isEmpty: categories.isEmpty)
+        collectionView.reloadData()
+    }
+}
+
+extension TrackersViewController: UICollectionViewDataSource {
+    func numberOfSections(in collectionView: UICollectionView) -> Int {
+        return viewModel.filteredCategories.count
+    }
+    
+    func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
+        return viewModel.filteredCategories[section].trackers.count
+    }
+    
+    func collectionView(
+        _ collectionView: UICollectionView,
+        viewForSupplementaryElementOfKind kind: String,
+        at indexPath: IndexPath
+    ) -> UICollectionReusableView {
+        guard kind == UICollectionView.elementKindSectionHeader else {
+            return UICollectionReusableView()
+        }
+        
+        let header = collectionView.dequeueReusableSupplementaryView(
+            ofKind: kind,
+            withReuseIdentifier: TrackerSectionHeaderView.reuseIdentifier,
+            for: indexPath
+        ) as! TrackerSectionHeaderView
+        
+        let category = viewModel.filteredCategories[indexPath.section]
+        header.configure(title: category.title)
+        
+        return header
+    }
+    
+    func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+        
+        let category = viewModel.filteredCategories[indexPath.section]
+        let tracker = category.trackers[indexPath.item]
+        
+        let selectedDate = viewModel.selectedDate
+        let isFutureDate = selectedDate > Date()
+        
+        guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "TrackerCell", for: indexPath) as? TrackerCell else {
+            return UICollectionViewCell()
+        }
+        
+        cell.configure(
+            with: tracker,
+            isCompletedToday: viewModel.isCompleted(tracker, on: selectedDate),
+            completedDays: viewModel.completedDaysCount(for: tracker),
+            isPlusbuttonEnabled: !isFutureDate
+        )
+        
+        cell.onToggle = { [weak self] in
+            guard let self = self else { return }
+            
+            if selectedDate <= Date() {
+                self.viewModel.toggleCompleted(tracker, on: selectedDate)
+            }
+        }
+        
+        return cell
+    }
+}
+
+extension TrackersViewController: UICollectionViewDelegate {
+    
+}
+
+extension TrackersViewController: UICollectionViewDelegateFlowLayout {
+    func collectionView(_ collectionView: UICollectionView,
+                        layout collectionViewLayout: UICollectionViewLayout,
+                        referenceSizeForHeaderInSection section: Int) -> CGSize {
+        return CGSize(width: collectionView.bounds.width,height: 36)
+    }
+}
