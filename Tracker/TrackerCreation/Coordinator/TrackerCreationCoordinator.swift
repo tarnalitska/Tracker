@@ -1,6 +1,6 @@
 import UIKit
 
-final class TrackerCreationCoordinator {
+final class TrackerCreationCoordinator: NSObject, UIAdaptivePresentationControllerDelegate {
     
     private let presentingViewController: UIViewController
     private var navigationController: UINavigationController?
@@ -48,6 +48,7 @@ final class TrackerCreationCoordinator {
         }
         
         let navVC = UINavigationController(rootViewController: creationVC)
+        navVC.presentationController?.delegate = self
         navigationController = navVC
         presentingViewController.present(navVC, animated: true)
     }
@@ -57,15 +58,24 @@ final class TrackerCreationCoordinator {
         
         scheduleVC.onScheduleSelected = { [weak self] selectedDays in
             self?.trackerDraft.schedule = Schedule(days: selectedDays)
-            print("\(String(describing: self?.trackerDraft.schedule))")
-            self?.navigationController?.popViewController(animated: true)
+            self?.navigationController?.presentedViewController?.dismiss(animated: true)
         }
         
-        navigationController?.pushViewController(scheduleVC, animated: true)
+        let modalNav = UINavigationController(rootViewController: scheduleVC)
+        modalNav.modalPresentationStyle = .pageSheet
+        modalNav.presentationController?.delegate = self
+        
+        navigationController?.present(modalNav, animated: true)
     }
     
     private func dismiss() {
-        navigationController?.dismiss(animated: true)
+        navigationController?.dismiss(animated: true) { [weak self] in
+            self?.onCancel?()
+        }
         navigationController = nil
+    }
+    
+    func presentationControllerDidDismiss(_ presentationController: UIPresentationController) {
+        onCancel?()
     }
 }
