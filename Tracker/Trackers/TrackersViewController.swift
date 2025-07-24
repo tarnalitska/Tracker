@@ -1,6 +1,6 @@
 import UIKit
 
-class TrackersViewController: UIViewController {
+final class TrackersViewController: UIViewController {
     
     private let viewModel = TrackersViewModel()
     private var trackers: [Tracker] = []
@@ -96,7 +96,7 @@ class TrackersViewController: UIViewController {
         updateEmptyState(isEmpty: categories.isEmpty)
     }
     
-    func addTitle() {
+    private func addTitle() {
         let label = UILabel()
         label.text = "Трекеры"
         label.textColor = .trackerBlack
@@ -111,7 +111,7 @@ class TrackersViewController: UIViewController {
         ])
     }
     
-    func addPlusButton() {
+    private func addPlusButton() {
         let plusButton = UIButton(type: .system)
         plusButton.tintColor = .trackerBlack
         plusButton.contentHorizontalAlignment = .left
@@ -132,19 +132,19 @@ class TrackersViewController: UIViewController {
         navigationItem.leftBarButtonItem = UIBarButtonItem(customView: containerView)
     }
     
-    func addDatePicker() {
+    private func addDatePicker() {
         let datePicker = UIDatePicker()
         datePicker.datePickerMode = .date
         datePicker.addTarget(self, action: #selector(dateChanged(_:)), for: .valueChanged)
         navigationItem.rightBarButtonItem = UIBarButtonItem(customView: datePicker)
     }
     
-    @objc func dateChanged(_ sender: UIDatePicker) {
+    @objc private func dateChanged(_ sender: UIDatePicker) {
         currentDate = sender.date
         viewModel.updateSelectedDate(currentDate)
     }
     
-    func updateEmptyState(isEmpty: Bool) {
+    private func updateEmptyState(isEmpty: Bool) {
         if isEmpty {
             if emptyView.superview == nil {
                 view.addSubview(emptyView)
@@ -162,6 +162,9 @@ class TrackersViewController: UIViewController {
     }
     
     @objc private func plusTapped() {
+        if trackerCoordinator != nil {
+            return
+        }
         let coordinator = TrackerCreationCoordinator(presentingViewController: self)
         
         coordinator.onFinishCreation = { [weak self] tracker, category in
@@ -175,14 +178,21 @@ class TrackersViewController: UIViewController {
             self.collectionView.reloadData()
             self.trackerCoordinator = nil
         }
+        
+        coordinator.onCancel = { [weak self] in
+            self?.trackerCoordinator = nil
+        }
+        
         coordinator.start()
         trackerCoordinator = coordinator
     }
 }
 
 extension TrackersViewController {
-    func addTracker(_ tracker: Tracker, to categoryTitle: String) {
-        if let existingCategoryIndex = categories.firstIndex(where: {$0.title == categoryTitle}) {
+    private func addTracker(_ tracker: Tracker, to categoryTitle: String) {
+        if let existingCategoryIndex = categories.firstIndex(
+            where: { $0.title == categoryTitle }
+        ) {
             let existingCategory = categories[existingCategoryIndex]
             
             let updatedCategory = TrackerCategory(
@@ -206,11 +216,11 @@ extension TrackersViewController {
 
 extension TrackersViewController: UICollectionViewDataSource {
     func numberOfSections(in collectionView: UICollectionView) -> Int {
-        return viewModel.filteredCategories.count
+        viewModel.filteredCategories.count
     }
     
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-        return viewModel.filteredCategories[section].trackers.count
+        viewModel.filteredCategories[section].trackers.count
     }
     
     func collectionView(
@@ -226,12 +236,12 @@ extension TrackersViewController: UICollectionViewDataSource {
             ofKind: kind,
             withReuseIdentifier: TrackerSectionHeaderView.reuseIdentifier,
             for: indexPath
-        ) as! TrackerSectionHeaderView
+        ) as? TrackerSectionHeaderView
         
         let category = viewModel.filteredCategories[indexPath.section]
-        header.configure(title: category.title)
+        header?.configure(title: category.title)
         
-        return header
+        return header ?? UICollectionReusableView()
     }
     
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
@@ -260,7 +270,6 @@ extension TrackersViewController: UICollectionViewDataSource {
                 self.viewModel.toggleCompleted(tracker, on: selectedDate)
             }
         }
-        
         return cell
     }
 }

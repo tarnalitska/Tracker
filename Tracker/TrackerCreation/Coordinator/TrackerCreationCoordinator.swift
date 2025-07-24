@@ -8,6 +8,7 @@ final class TrackerCreationCoordinator {
     private var trackerDraft = TrackerDraft()
     
     var onFinishCreation: ((Tracker, String) -> Void)?
+    var onCancel: (() -> Void)?
     
     init(presentingViewController: UIViewController) {
         self.presentingViewController = presentingViewController
