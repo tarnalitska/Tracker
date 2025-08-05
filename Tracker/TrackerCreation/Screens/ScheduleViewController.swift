@@ -82,7 +82,8 @@ final class ScheduleViewController: UIViewController {
         ])
     }
     
-    @objc private func doneTapped() {        onScheduleSelected?(selectedDays)
+    @objc private func doneTapped() {
+        onScheduleSelected?(selectedDays)
     }
 }
 

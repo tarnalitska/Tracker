@@ -3,7 +3,7 @@ import UIKit
 final class TrackersViewController: UIViewController {
     
     private let viewModel = TrackersViewModel()
-    private var trackers: [Tracker] = []
+    
     private var trackerCoordinator: TrackerCreationCoordinator?
     private var currentDate: Date = Date()
     
@@ -53,30 +53,48 @@ final class TrackersViewController: UIViewController {
         return view
     }()
     
-    var categories: [TrackerCategory] = []
-    var completedTrackers: [TrackerRecord] = []
-    
     override func viewDidLoad() {
         super.viewDidLoad()
         
-        let defaultCategory = TrackerCategory(title: "Мои трекеры", trackers: [])
-        categories = [defaultCategory]
-        viewModel.setCategories(categories)
-        
+        setupViewModelCallbacks()
+        loadInitialData()
         setupUI()
-        
-        collectionView.reloadData()
-        
+    }
+    
+    private func setupViewModelCallbacks() {
         viewModel.onRecordsChanged = { [weak self] in
-            self?.collectionView.reloadData()
+            DispatchQueue.main.async {
+                self?.collectionView.reloadData()
+            }
         }
         
         viewModel.onCategoriesUpdated = { [weak self] in
-            self?.collectionView.reloadData()
-            self?.updateEmptyState(isEmpty: self?.viewModel.filteredCategories.isEmpty ?? true)
+            DispatchQueue.main.async {
+                self?.collectionView.reloadData()
+                self?.updateEmptyState(isEmpty: self?.viewModel.filteredCategories.isEmpty ?? true)
+            }
         }
-        
-        viewModel.setCategories(categories)
+    }
+    
+    private func loadInitialData() {
+        do {
+            let categories = try viewModel.categoryStore.fetchAll()
+            viewModel.setCategories(categories)
+            
+            if categories.isEmpty {
+                let defaultCategory = TrackerCategory(title: "Мои трекеры", trackers: [])
+                try viewModel.categoryStore.save(defaultCategory)
+                viewModel.setCategories([defaultCategory])
+            }
+            
+            viewModel.updateSelectedDate(currentDate)
+            
+        } catch {
+            print("Ошибка загрузки данных: \(error)")
+            
+            let defaultCategory = TrackerCategory(title: "Мои трекеры", trackers: [])
+            viewModel.setCategories([defaultCategory])
+        }
     }
     
     private func setupUI() {
@@ -93,7 +111,7 @@ final class TrackersViewController: UIViewController {
             collectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
         
-        updateEmptyState(isEmpty: categories.isEmpty)
+        updateEmptyState(isEmpty: viewModel.filteredCategories.isEmpty)
     }
     
     private func addTitle() {
@@ -167,15 +185,11 @@ final class TrackersViewController: UIViewController {
         }
         let coordinator = TrackerCreationCoordinator(presentingViewController: self)
         
-        coordinator.onFinishCreation = { [weak self] tracker, category in
+        coordinator.onFinishCreation = { [weak self] tracker, categoryTitle in
             guard let self = self else { return }
             
-            self.addTracker(tracker, to: category)
-            self.viewModel.setCategories(self.categories)
+            self.addTracker(tracker, to: categoryTitle)
             
-            self.viewModel.updateSelectedDate(self.viewModel.selectedDate)
-            
-            self.collectionView.reloadData()
             self.trackerCoordinator = nil
         }
         
@@ -190,27 +204,20 @@ final class TrackersViewController: UIViewController {
 
 extension TrackersViewController {
     private func addTracker(_ tracker: Tracker, to categoryTitle: String) {
-        if let existingCategoryIndex = categories.firstIndex(
-            where: { $0.title == categoryTitle }
-        ) {
-            let existingCategory = categories[existingCategoryIndex]
-            
-            let updatedCategory = TrackerCategory(
-                title: existingCategory.title,
-                trackers: existingCategory.trackers + [tracker]
-            )
-            
-            categories[existingCategoryIndex] = updatedCategory
-        } else {
-            let newCategory = TrackerCategory(
-                title: categoryTitle,
-                trackers: [tracker]
-            )
-            categories.append(newCategory)
-        }
         
-        updateEmptyState(isEmpty: categories.isEmpty)
-        collectionView.reloadData()
+        do {
+            let categories = try viewModel.categoryStore.fetchAll()
+            
+            if let existingCategory = categories.first(where: { $0.title == categoryTitle }) {
+                try viewModel.trackerStore.save(tracker, to: existingCategory)
+            } else {
+                let newCategory = TrackerCategory(title: categoryTitle, trackers: [])
+                try viewModel.categoryStore.save(newCategory)
+                try viewModel.trackerStore.save(tracker, to: newCategory)
+            }
+        } catch {
+            print("Ошибка сохранения трекера: \(error)")
+        }
     }
 }
 
@@ -272,10 +279,6 @@ extension TrackersViewController: UICollectionViewDataSource {
         }
         return cell
     }
-}
-
-extension TrackersViewController: UICollectionViewDelegate {
-    
 }
 
 extension TrackersViewController: UICollectionViewDelegateFlowLayout {

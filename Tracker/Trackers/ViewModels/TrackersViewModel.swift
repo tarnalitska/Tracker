@@ -2,6 +2,10 @@ import Foundation
 
 final class TrackersViewModel {
     
+    let trackerStore: TrackerStore
+    let categoryStore: TrackerCategoryStore
+    let recordStore: TrackerRecordStore
+    
     private(set) var categories: [TrackerCategory] = []
     private(set) var filteredCategories: [TrackerCategory] = []
     
@@ -11,8 +15,7 @@ final class TrackersViewModel {
         }
     }
     
-    private(set) var completedRecords: [TrackerRecord] =  []
-    {
+    private(set) var completedRecords: [TrackerRecord] = [] {
         didSet {
             onRecordsChanged?()
         }
@@ -20,6 +23,25 @@ final class TrackersViewModel {
     
     var onCategoriesUpdated: (() -> Void)?
     var onRecordsChanged: (() -> Void)?
+    
+    init() {
+        self.trackerStore = TrackerStore()
+        self.categoryStore = TrackerCategoryStore()
+        self.recordStore = TrackerRecordStore()
+        
+        self.trackerStore.delegate = self
+        
+        loadCompletedRecords()
+    }
+    
+    private func loadCompletedRecords() {
+        do {
+            completedRecords = try recordStore.fetchAll()
+        } catch {
+            print("Ошибка загрузки записей: \(error)")
+            completedRecords = []
+        }
+    }
     
     func setCategories(_ categories: [TrackerCategory]) {
         self.categories = categories
@@ -35,10 +57,20 @@ final class TrackersViewModel {
     }
     
     func toggleCompleted(_ tracker: Tracker, on date: Date) {
-        if let index = completedRecords.firstIndex(where: { $0.trackerID == tracker.id && Calendar.current.isDate($0.date, inSameDayAs: date) }) {
-            completedRecords.remove(at: index)
-        } else {
-            completedRecords.append(TrackerRecord(trackerID: tracker.id, date: date))
+        do {
+            if let index = completedRecords.firstIndex(where: {
+                $0.trackerID == tracker.id && Calendar.current.isDate($0.date, inSameDayAs: date)
+            }) {
+                let recordToDelete = completedRecords[index]
+                try recordStore.delete(recordToDelete)
+                completedRecords.remove(at: index)
+            } else {
+                let newRecord = TrackerRecord(trackerID: tracker.id, date: date)
+                try recordStore.save(newRecord)
+                completedRecords.append(newRecord)
+            }
+        } catch {
+            print("Ошибка при изменении состояния трекера: \(error)")
         }
     }
     
@@ -62,5 +94,16 @@ final class TrackersViewModel {
         }
         
         onCategoriesUpdated?()
+    }
+}
+
+extension TrackersViewModel: TrackerStoreDelegate {
+    func trackerStoreDidUpdate() {
+        do {
+            let categories = try categoryStore.fetchAll()
+            setCategories(categories)
+        } catch {
+            print("Ошибка обновления категорий: \(error)")
+        }
     }
 }

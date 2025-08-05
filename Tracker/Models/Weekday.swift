@@ -1,6 +1,6 @@
 import Foundation
 
-enum Weekday: String, CaseIterable {
+enum Weekday: String, CaseIterable, Codable {
     case monday, tuesday, wednesday, thursday, friday, saturday, sunday
 }
 
@@ -31,3 +31,15 @@ extension Weekday {
         } 
     }
 }
+
+extension Weekday {
+    static func from(rawValue: String) -> Set<Weekday> {
+        let components = rawValue.components(separatedBy: ",")
+        return Set(components.compactMap { Weekday(rawValue: $0) })
+    }
+    
+    static func toRawValue(from weekdays: Set<Weekday>) -> String {
+        weekdays.map { $0.rawValue }.joined(separator: ",")
+    }
+}
+
