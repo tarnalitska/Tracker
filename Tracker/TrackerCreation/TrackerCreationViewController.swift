@@ -2,6 +2,8 @@ import UIKit
 
 final class TrackerCreationViewController: UIViewController, UITextFieldDelegate {
     
+    // MARK: - Properties
+    
     private let scrollView = UIScrollView()
     private let contentView = UIView()
     
@@ -167,6 +169,8 @@ final class TrackerCreationViewController: UIViewController, UITextFieldDelegate
         return button
     }()
     
+    // MARK: - Lifecycle
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         scrollView.alwaysBounceVertical = true
@@ -194,6 +198,8 @@ final class TrackerCreationViewController: UIViewController, UITextFieldDelegate
         super.viewDidLayoutSubviews()
         updateScrollViewContentSize()
     }
+    
+    // MARK: - Setup UI
     
     private func setupUI() {
         
@@ -298,6 +304,8 @@ final class TrackerCreationViewController: UIViewController, UITextFieldDelegate
         ])
     }
     
+    // MARK: - Actions
+    
     @objc private func categoryButtonTapped() {
         print("Category tapped ✅")
     }
@@ -355,6 +363,8 @@ final class TrackerCreationViewController: UIViewController, UITextFieldDelegate
         }
     }
     
+    // MARK: - Keyboard Handling
+    
     @objc private func keyboardWillShow(notification: Notification) {
         guard let keyboardFrame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect else { return }
         scrollView.contentInset.bottom = keyboardFrame.height + 20
@@ -363,6 +373,8 @@ final class TrackerCreationViewController: UIViewController, UITextFieldDelegate
     @objc private func keyboardWillHide(notification: Notification) {
         scrollView.contentInset.bottom = 0
     }
+    
+    // MARK: - TextField
     
     func textFieldShouldReturn(_ textField: UITextField) -> Bool {
         textField.resignFirstResponder()
@@ -383,6 +395,8 @@ final class TrackerCreationViewController: UIViewController, UITextFieldDelegate
         scrollView.contentSize = CGSize(width: scrollView.frame.width, height: contentHeight)
     }
 }
+
+// MARK: - UICollectionViewDataSource
 
 extension TrackerCreationViewController: UICollectionViewDataSource {
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
@@ -409,6 +423,8 @@ extension TrackerCreationViewController: UICollectionViewDataSource {
         return UICollectionViewCell()
     }
 }
+
+// MARK: - UICollectionViewDelegate
 
 extension TrackerCreationViewController: UICollectionViewDelegate {
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {

@@ -2,6 +2,8 @@ import UIKit
 
 final class ColorCell: UICollectionViewCell {
     
+    // MARK: - Properties (Views)
+    
     private let outerBorderView: UIView = {
         let view = UIView()
         view.layer.cornerRadius = 8
@@ -19,6 +21,8 @@ final class ColorCell: UICollectionViewCell {
         return view
     }()
     
+    // MARK: - Init
+    
     override init(frame: CGRect) {
         super.init(frame: frame)
         setup()
@@ -28,6 +32,16 @@ final class ColorCell: UICollectionViewCell {
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
+    
+    // MARK: - Public Methods
+    
+    func configure(with color: UIColor, isSelected: Bool) {
+        innerColorView.backgroundColor = color
+        outerBorderView.layer.borderWidth = isSelected ? 3 : 0
+        outerBorderView.layer.borderColor = isSelected ? color.withAlphaComponent(0.3).cgColor : nil
+    }
+    
+    // MARK: - Private Methods
     
     private func setup() {
         contentView.addSubview(outerBorderView)
@@ -47,12 +61,6 @@ final class ColorCell: UICollectionViewCell {
             innerColorView.trailingAnchor.constraint(equalTo: outerBorderView.trailingAnchor, constant: -3),
             
         ])
-    }
-    
-    func configure(with color: UIColor, isSelected: Bool) {
-        innerColorView.backgroundColor = color
-        outerBorderView.layer.borderWidth = isSelected ? 3 : 0
-        outerBorderView.layer.borderColor = isSelected ? color.withAlphaComponent(0.3).cgColor : nil
     }
 }
 
