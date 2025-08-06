@@ -18,8 +18,6 @@ final class TrackerCreationCoordinator: NSObject, UIAdaptivePresentationControll
         let creationVC = TrackerCreationViewController()
         
         creationVC.onScheduleSelect = { [weak self] in
-            print("➡️ onScheduleSelect called from VC")
-            
             self?.showScheduleScreen()
         }
         
@@ -27,11 +25,13 @@ final class TrackerCreationCoordinator: NSObject, UIAdaptivePresentationControll
             self?.dismiss()
         }
         
-        creationVC.onCreateTracker = { [weak self] name, category, emoji, color in
-            
+        creationVC.onCreateTracker = { [weak self] (name: String, category: String, emoji: String, color: UIColor) in
             guard let self = self else { return }
-            guard let schedule = self.trackerDraft.schedule else {
-                print("🚫 Schedule не задан — трекер не создан")
+            
+            guard let emoji = creationVC.viewModel.selectedEmoji,
+                  let color = creationVC.viewModel.selectedColor,
+                  let schedule = self.trackerDraft.schedule else {
+                print("🚫 Не выбраны emoji, цвет или schedule не задан — трекер не создан")
                 return
             }
             
